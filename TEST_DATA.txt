@@ -1,0 +1,15 @@
+[
+  {
+    "description": "1. Lasso Regression (6 variables, 6 constraints)",
+    "code": "import numpy as np\nimport osqp\nfrom scipy import sparse\n\nX = np.array([[1,2,3],\n              [2,0,1],\n              [0,1,1],\n              [1,1,0],\n              [2,1,2]], dtype=float)\ny = np.array([1,2,1,0,3], dtype=float)\nlambda_ = 0.5\n\nm, n = X.shape\nP = sparse.block_diag([X.T@X, X.T@X], format='csc')\nq = np.hstack([-X.T@y + lambda_,  X.T@y + lambda_])\nA = sparse.eye(2*n, format='csc')\nl = np.zeros(2*n)\nu = np.inf * np.ones(2*n)\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u)\nres = prob.solve()\n\nu_opt = res.x[:n]\nv_opt = res.x[n:]\nw_opt = u_opt - v_opt\nprint(\"Lasso w* =\", np.round(w_opt, 4))"
+  },
+  {
+    "description": "2. Support Vector Machine (Hard‐Margin SVM) (6 variables, 7 constraints)",
+    "code": "import numpy as np\nimport osqp\nfrom scipy import sparse\n\nX = np.array([[2,2],[2,0],[-2,-1],[-1,-2]], dtype=float)\ny = np.array([1,1,-1,-1], dtype=float)\nC = 1.0\n\nm, d = X.shape\nP = sparse.block_diag([np.eye(d), np.zeros((1+m,1+m))], format='csc')\nq = np.hstack([np.zeros(d+1), C*np.ones(m)])\n\nA1 = - (y[:,None] * np.hstack([X, np.ones((m,1)), np.eye(m)]))\nl1 = -np.inf * np.ones(m)\nu1 = -np.ones(m)\n\nA2 = sparse.hstack([sparse.csc_matrix((m,d+1)), sparse.eye(m)], format='csc')\nl2 = np.zeros(m)\nu2 = np.inf * np.ones(m)\n\nA = sparse.vstack([A1, A2], format='csc')\nl = np.hstack([l1, l2])\nu = np.hstack([u1, u2])\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u)\nres = prob.solve()\n\nw_opt = res.x[:d]\nb_opt = res.x[d]\nprint(\"SVM w* =\", np.round(w_opt,4), \"b* =\", round(b_opt,4))"
+  },
+  {
+    "description": "3. Portfolio Optimization (Markowitz) (5 variables, 8 constraints)",
+    "code": "import numpy as np\nimport osqp\nfrom scipy import sparse\n\nn = 5\nmu = np.array([0.10, 0.12, 0.14, 0.08, 0.09])\nA_rand = np.random.randn(n, n)\nSigma = A_rand.T @ A_rand + 0.1 * np.eye(n)\ngamma = 5.0\n\nP = sparse.csc_matrix(Sigma)\nq = -gamma * mu\n\nA1 = sparse.csc_matrix(np.ones((1, n)))\nl1 = u1 = np.array([1.0])\n\nA2 = sparse.eye(n, format='csc')\nl2 = np.zeros(n)\nu2 = np.inf * np.ones(n)\n\nA3 = sparse.eye(n, format='csc')\nl3 = -np.inf * np.ones(n)\nu3 = 0.5 * np.ones(n)\n\nA = sparse.vstack([A1, A2, A3], format='csc')\nl = np.hstack([l1, l2, l3])\nu = np.hstack([u1, u2, u3])\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u)\nres = prob.solve()\n\nprint(\"Portfolio x* =\", np.round(res.x, 4))"
+  }
+
+]

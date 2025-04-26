@@ -1,0 +1,127 @@
+[
+  {
+    "description": "1. Lasso Regression (6 variables, 6 constraints)",
+    "code": "import numpy as np\nimport osqp\nfrom scipy import sparse\n\nX = np.array([[1,2,3],\n              [2,0,1],\n              [0,1,1],\n              [1,1,0],\n              [2,1,2]], dtype=float)\ny = np.array([1,2,1,0,3], dtype=float)\nlambda_ = 0.5\n\nm, n = X.shape\nP = sparse.block_diag([X.T@X, X.T@X], format='csc')\nq = np.hstack([-X.T@y + lambda_,  X.T@y + lambda_])\nA = sparse.eye(2*n, format='csc')\nl = np.zeros(2*n)\nu = np.inf * np.ones(2*n)\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u)\nres = prob.solve()\n\nu_opt = res.x[:n]\nv_opt = res.x[n:]\nw_opt = u_opt - v_opt\nprint(\"Lasso w* =\", np.round(w_opt, 4))"
+  },
+  {
+    "description": "2. Support Vector Machine (Hard‐Margin SVM) (6 variables, 7 constraints)",
+    "code": "import numpy as np\nimport osqp\nfrom scipy import sparse\n\nX = np.array([[2,2],[2,0],[-2,-1],[-1,-2]], dtype=float)\ny = np.array([1,1,-1,-1], dtype=float)\nC = 1.0\n\nm, d = X.shape\nP = sparse.block_diag([np.eye(d), np.zeros((1+m,1+m))], format='csc')\nq = np.hstack([np.zeros(d+1), C*np.ones(m)])\n\nA1 = - (y[:,None] * np.hstack([X, np.ones((m,1)), np.eye(m)]))\nl1 = -np.inf * np.ones(m)\nu1 = -np.ones(m)\n\nA2 = sparse.hstack([sparse.csc_matrix((m,d+1)), sparse.eye(m)], format='csc')\nl2 = np.zeros(m)\nu2 = np.inf * np.ones(m)\n\nA = sparse.vstack([A1, A2], format='csc')\nl = np.hstack([l1, l2])\nu = np.hstack([u1, u2])\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u)\nres = prob.solve()\n\nw_opt = res.x[:d]\nb_opt = res.x[d]\nprint(\"SVM w* =\", np.round(w_opt,4), \"b* =\", round(b_opt,4))"
+  },
+  {
+    "description": "3. Portfolio Optimization (Markowitz) (5 variables, 8 constraints)",
+    "code": "import numpy as np\nimport osqp\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nn = 5\nmu = np.array([0.10, 0.12, 0.14, 0.08, 0.09])\nA_rand = np.random.randn(n, n)\nSigma = A_rand.T @ A_rand + 0.1 * np.eye(n)\ngamma = 5.0\n\nP = sparse.csc_matrix(Sigma)\nq = -gamma * mu\n\nA1 = sparse.csc_matrix(np.ones((1, n)))\nl1 = u1 = np.array([1.0])\n\nA2 = sparse.eye(n, format='csc')\nl2 = np.zeros(n)\nu2 = np.inf * np.ones(n)\n\nA3 = sparse.eye(n, format='csc')\nl3 = -np.inf * np.ones(n)\nu3 = 0.5 * np.ones(n)\n\nA = sparse.vstack([A1, A2, A3], format='csc')\nl = np.hstack([l1, l2, l3])\nu = np.hstack([u1, u2, u3])\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u)\nres = prob.solve()\n\nprint(\"Portfolio x* =\", np.round(res.x, 4))"
+  },
+  {
+    "description": "4. Portfolio Optimization (6 assets, 6 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nn = 6\nmu = np.array([0.1, 0.12, 0.15, 0.08, 0.09, 0.11])\nSigma = np.array([\n    [0.1, 0.02, 0.01, 0.03, 0.01, 0.02],\n    [0.02, 0.12, 0.03, 0.02, 0.01, 0.03],\n    [0.01, 0.03, 0.15, 0.01, 0.02, 0.03],\n    [0.03, 0.02, 0.01, 0.08, 0.01, 0.02],\n    [0.01, 0.01, 0.02, 0.01, 0.09, 0.01],\n    [0.02, 0.03, 0.03, 0.02, 0.01, 0.11]\n])\ntarget_return = 0.1\n\nP = sparse.csc_matrix(Sigma)\nq = np.zeros(n)\nA = sparse.csc_matrix(np.vstack((np.ones(n), mu, np.eye(n))))\nl = np.hstack((1, target_return, np.zeros(n)))\nu = np.hstack((1, target_return, np.ones(n)))\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u)\nres = prob.solve()\nprint(res.x)"
+  },
+  {
+    "description": "5. Lasso Regression (8 variables, 10 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(1)\nm, n = 20, 8\nA = np.random.randn(m, n)\nb = np.random.randn(m)\nlambda_ = 0.1\n\nP = sparse.csc_matrix(np.vstack((np.hstack((A.T @ A, -A.T @ A)), np.hstack((-A.T @ A, A.T @ A)))))\nq = np.hstack((-A.T @ b, A.T @ b)) + lambda_ * np.ones(2*n)\nA_eq = sparse.csc_matrix(np.hstack((np.ones(n), -np.ones(n))).reshape(1, 2*n))\nl_eq = np.array([0])\nu_eq = np.array([0])\nA_ineq = sparse.eye(2*n)\nl_ineq = np.zeros(2*n)\nu_ineq = np.inf * np.ones(2*n)\nA = sparse.vstack([A_eq, A_ineq], format='csc')\nl = np.hstack([l_eq, l_ineq])\nu = np.hstack([u_eq, u_ineq])\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u)\nres = prob.solve()\nprint(res.x)"
+  },
+  {
+    "description": "6. Portfolio Optimization (15 assets, 15 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nn = 15\nmu = np.array([0.08,0.09,0.10,0.11,0.12,0.13,0.14,0.15,0.16,0.17,0.18,0.19,0.20,0.21,0.22])\nSigma = np.diag(np.linspace(0.1,0.3,n)) + 0.01*np.random.randn(n,n)\nSigma = Sigma.T @ Sigma\ntarget_return = 0.15\n\nP = sparse.csc_matrix(Sigma)\nq = np.zeros(n)\nA = sparse.csc_matrix(np.vstack((np.ones(n),mu,np.eye(n))))\nl = np.hstack((1,target_return,np.zeros(n)))\nu = np.hstack((1,target_return,0.2*np.ones(n)))\n\nprob = osqp.OSQP()\nprob.setup(P,q,A,l,u,verbose=True)\nres = prob.solve()\nprint(res.x)"
+  },
+  {
+    "description": "7. Support Vector Machine (18 variables, 18 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(3)\nn = 18\nX = np.random.randn(n,2)\ny = np.sign(np.random.randn(n))\nC = 1.0\n\nP = sparse.block_diag([sparse.eye(2),sparse.csc_matrix((n+1,n+1))],format='csc') + 1e-6*sparse.eye(2+n+1)\nq = np.hstack([np.zeros(2+1),C*np.ones(n)])\nA = sparse.vstack([\n    sparse.hstack([sparse.diags(y)@X,sparse.csc_matrix(y.reshape(-1,1)),sparse.eye(n)]),\n    sparse.eye(2+n+1)\n],format='csc')\nl = np.hstack([np.ones(n),np.zeros(2+n+1)])\nu = np.hstack([np.inf*np.ones(n),np.inf*np.ones(2+n+1)])\n\nprob = osqp.OSQP()\nprob.setup(P,q,A,l,u,verbose=True)\nres = prob.solve()\nprint(res.x)"
+  },
+  {
+    "description": "8. SVM Classification (35 variables, 40 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(1)\nn_samples = 30\nn_features = 5\nX = np.random.randn(n_samples, n_features)\ny = np.sign(np.random.randn(n_samples))\nC = 1.0\n\nP = sparse.block_diag([sparse.eye(n_features), sparse.csc_matrix((n_samples+1, n_samples+1))]) + 1e-6*sparse.eye(n_features+n_samples+1)\nq = np.hstack([np.zeros(n_features+1), C*np.ones(n_samples)])\nA = sparse.vstack([\n    sparse.hstack([sparse.diags(y)@X, sparse.csc_matrix(y.reshape(-1,1)), sparse.eye(n_samples)]),\n    sparse.eye(n_features+n_samples+1)\n])\nl = np.hstack([np.ones(n_samples), np.zeros(n_features+n_samples+1)])\nu = np.hstack([np.inf*np.ones(n_samples), np.inf*np.ones(n_features+n_samples+1)])\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u, verbose=True)\nres = prob.solve()"
+  },
+  {
+    "description": "9. Quadratic Program with Box Constraints (20 variables, 20 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nn = 20\nP = sparse.diags(np.arange(1,n+1)) + 0.1*sparse.random(n,n,density=0.2)\nP = P.T@P\nq = np.random.randn(n)\nA = sparse.eye(n)\nl = -2*np.ones(n)\nu = 2*np.ones(n)\n\nprob = osqp.OSQP()\nprob.setup(P,q,A,l,u,verbose=True)\nres = prob.solve()\nprint(res.x)"
+  },
+  {
+    "description": "10. Portfolio Optimization (35 assets, 35 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(69)\nn = 35\nmu = np.linspace(0.05, 0.25, n)\nSigma = np.diag(np.linspace(0.1, 0.4, n)) + 0.02*np.random.randn(n,n)\nSigma = Sigma.T @ Sigma\ntarget_return = 0.18\n\nP = sparse.csc_matrix(Sigma)\nq = np.zeros(n)\nA = sparse.csc_matrix(np.vstack((np.ones(n), mu, np.eye(n))))\nl = np.hstack((1, target_return, np.zeros(n)))\nu = np.hstack((1, target_return, 0.15*np.ones(n)))\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u, verbose=True)\nres = prob.solve()\nprint(res.x)"
+  },
+  {
+    "description": "11. Support Vector Machine (38 variables, 38 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(6)\nn = 38\nX = np.random.randn(n, 5)\ny = np.sign(np.random.randn(n))\nC = 0.8\n\nP = sparse.block_diag([sparse.eye(5), sparse.csc_matrix((n+1, n+1))], format='csc') + 1e-6*sparse.eye(5+n+1)\nq = np.hstack([np.zeros(5+1), C*np.ones(n)])\nA = sparse.vstack([\n    sparse.hstack([sparse.diags(y)@X, sparse.csc_matrix(y.reshape(-1,1)), sparse.eye(n)]),\n    sparse.eye(5+n+1)\n], format='csc')\nl = np.hstack([np.ones(n), np.zeros(5+n+1)])\nu = np.hstack([np.inf*np.ones(n), np.inf*np.ones(5+n+1)])\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u, verbose=True)\nres = prob.solve()\nprint(res.x)"
+  },
+{
+  "description": "12. Production Planning with Capacity Constraints",
+  "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(123)\nn = 35\ncost = np.random.uniform(5, 20, n)\ncapacity = np.random.uniform(100, 500, n)\ndemand = 2000\n\nP = sparse.diags(np.random.uniform(0.1, 0.5, n))\nq = cost\nA = sparse.vstack((\n    np.ones(n),\n    sparse.eye(n),\n    sparse.random(5, n, density=0.3)\n))\nl = np.hstack((demand, np.zeros(n), -np.inf*np.ones(5)))\nu = np.hstack((demand, capacity, np.ones(5)))\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u, verbose=True)\nres = prob.solve()"
+},
+
+  {
+    "description": "13. Quadratic Program with Box Constraints (40 variables, 40 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nn = 40\nP = sparse.diags(np.linspace(1,3,n)) + 0.05*sparse.random(n,n,density=0.15)\nP = P.T@P\nq = np.random.randn(n)\nA = sparse.eye(n)\nl = -1.5*np.ones(n)\nu = 1.5*np.ones(n)\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u, verbose=True)\nres = prob.solve()\nprint(res.x)"
+  },
+{
+  "description": "14. Lasso",
+  "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n# Problem dimensions\nn_features = 30  # Number of variables\nn_samples = 100  # Number of data points\nlambda_ = 0.1    # L1 regularization strength\n\n# Generate synthetic data\nnp.random.seed(1)\nX = np.random.randn(n_samples, n_features)\ntrue_coeffs = np.zeros(n_features)\ntrue_coeffs[:5] = [1, -2, 3, -1.5, 2]  # Only 5 active features\ny = X @ true_coeffs + 0.1 * np.random.randn(n_samples)\n\n# OSQP formulation (Lasso as QP)\nP = sparse.csc_matrix(X.T @ X)          # Quadratic term (X'X)\nq = -X.T @ y                            # Linear term (-X'y)\nA = sparse.vstack([                     # Constraints for L1 penalty:\n    sparse.eye(n_features),             #  β ≤ t\n    -sparse.eye(n_features)             # -β ≤ t\n])\nl = -np.inf * np.ones(2 * n_features)   # No lower bounds\nu = np.full(2 * n_features, lambda_)    # Upper bounds (t ≤ λ)\n\n# Solve\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u, verbose=True)\nres = prob.solve()\n\n# Print results\nprint(\"True coefficients (first 10):\", true_coeffs[:10].round(2))\nprint(\"Lasso estimates (first 10):  \", res.x[:10].round(2))\nprint(f\"Number of zero coefficients: {np.sum(np.abs(res.x) < 1e-3)}/{n_features}\")"
+},
+
+
+  {
+    "description": "15. Support Vector Machine (68 variables, 68 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(9)\nn = 68\nX = np.random.randn(n, 7)\ny = np.sign(np.random.randn(n))\nC = 0.7\n\nP = sparse.block_diag([sparse.eye(7), sparse.csc_matrix((n+1, n+1))], format='csc') + 1e-6*sparse.eye(7+n+1)\nq = np.hstack([np.zeros(7+1), C*np.ones(n)])\nA = sparse.vstack([\n    sparse.hstack([sparse.diags(y)@X, sparse.csc_matrix(y.reshape(-1,1)), sparse.eye(n)]),\n    sparse.eye(7+n+1)\n], format='csc')\nl = np.hstack([np.ones(n), np.zeros(7+n+1)])\nu = np.hstack([np.inf*np.ones(n), np.inf*np.ones(7+n+1)])\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u, verbose=True)\nres = prob.solve()\nprint(res.x)"
+  },
+{
+  "description": "16. Chemical Process Optimization",
+  "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(123)\nn = 30\nreactivity = np.random.uniform(0.5, 2.0, n)\nsafety_limits = np.random.uniform(10, 100, n)\n\nP = sparse.diags(reactivity * 0.1)\nq = -np.ones(n)  # Maximize production\nA = sparse.vstack((\n    sparse.random(5, n, density=0.5),  # Material balances\n    sparse.eye(n)\n))\nl = np.hstack((np.zeros(5), np.zeros(n)))\nu = np.hstack((np.zeros(5), safety_limits))\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u, verbose=True)\nres = prob.solve()"
+},
+
+{
+  "description": "17.  Lasso Regression (Feature Selection)",
+  "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(123)\nn_features = 35\nn_samples = 200\nlam = 0.1  # L1 penalty\n\n# Generate data\nA = np.random.randn(n_samples, n_features)\nb = np.random.randn(n_samples)\n\n# OSQP formulation (using slack variables)\nP = sparse.block_diag([A.T @ A, sparse.csc_matrix((n_features, n_features))])\nq = np.hstack([-A.T @ b, lam*np.ones(n_features)])\nA_con = sparse.hstack([sparse.eye(n_features), -sparse.eye(n_features)])\nA = sparse.vstack([A_con, -A_con])\nl = np.hstack([-np.inf*np.ones(n_features), np.zeros(n_features)])\nu = np.hstack([np.zeros(n_features), np.inf*np.ones(n_features)])\n\n# Solve\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u, verbose=True)\nres = prob.solve()\nprint(f\"Lasso coefficients: {res.x[:n_features].round(3)}\")"
+},
+
+  {
+    "description": "18. Time-Varying MPC (50 variables, 55 constraints)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nnp.random.seed(13)\nn = 50\nA = np.eye(n) + 0.01*np.diag(np.ones(n-1),1)\nB = np.eye(n)\nQ = sparse.diags(np.linspace(1,3,n))\nR = 0.1*sparse.eye(n)\nx0 = np.random.randn(n)\n\nP = sparse.block_diag([2*Q, 2*R])\nq = np.hstack([-2*Q@x0, np.zeros(n)])\nA = sparse.vstack([\n    sparse.hstack([sparse.eye(n), -B]),\n    sparse.hstack([-sparse.eye(n), -B]),\n    sparse.eye(2*n)\n])\nl = np.hstack([-2*np.ones(n), -np.inf*np.ones(n), np.zeros(2*n)])\nu = np.hstack([2*np.ones(n), np.inf*np.ones(n), 5*np.ones(2*n)])\n\nprob = osqp.OSQP()\nprob.setup(P, q, A, l, u, verbose=True)\nres = prob.solve()"
+  },
+  {
+    "description": "19. Portfolio Optimization (Markowitz Model)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\n# Generate random data\nn = 10  # assets\nP = sparse.csc_matrix(np.random.randn(n, n))  # Covariance matrix\nP = P.T @ P  # Ensure PSD\nq = np.zeros(n)\nA = sparse.csc_matrix(np.vstack([np.ones(n), np.random.randn(2, n)]))  \nl = np.array([1, 0.05, -0.1])  # Budget = 1, return >= 0.05\nu = np.array([1, 0.1, 0.1])    # Upper bounds\n\n# Solve\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u)\nres = prob.solve()\nprint(f\"Optimal portfolio weights: {res.x.round(3)}\")"
+  },
+  {
+    "description": "20. Lasso as QP: (1/2)||Ax - b||² + λ||x||₁",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nm, n = 50, 20\nA = sparse.csc_matrix(np.random.randn(m, n))\nb = np.random.randn(m)\nlam = 0.1\n\n# Reformulate as QP with slack variables\nP = sparse.block_diag([A.T @ A, sparse.csc_matrix((n, n))]).tocsc()\nq = np.hstack([-A.T @ b, lam * np.ones(n)])\nA_eq = sparse.hstack([sparse.eye(n), -sparse.eye(n)])\nA_ineq = sparse.hstack([sparse.eye(n), sparse.eye(n)])\nA = sparse.vstack([A_eq, A_ineq])\nl = np.hstack([np.zeros(n), -np.inf * np.ones(n)])\nu = np.hstack([np.zeros(n), np.inf * np.ones(n)])\n\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u)\nres = prob.solve()\nprint(f\"Lasso coefficients: {res.x[:n].round(3)}\")"
+  },
+  {
+    "description": "21. SVM",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nm, n = 50, 20  # Samples, features\nX = np.random.randn(m, n)\ny = 2 * (np.random.rand(m) > 0.5) - 1  # Binary labels\nC = 1.0\n\n# SVM QP: (1/2)||w||² + C∑ξ_i\nP = sparse.block_diag([sparse.eye(n), sparse.csc_matrix((m, m))]).tocsc()\nq = np.hstack([np.zeros(n), C * np.ones(m)])\nA = sparse.vstack([\n    sparse.hstack([sparse.diags(y) @ X, sparse.eye(m)]),  # Margin constraints\n    sparse.hstack([sparse.csc_matrix((m, n)), sparse.eye(m)])  # ξ ≥ 0\n])\nl = np.hstack([np.ones(m), np.zeros(m)])\nu = np.hstack([np.inf * np.ones(m), np.inf * np.ones(m)])\n\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u)\nres = prob.solve()\nprint(f\"SVM weights: {res.x[:n].round(3)}\")"
+  },
+  {
+    "description": "22. Least Squares with Bounds",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nm, n = 50, 25\nA = sparse.csc_matrix(np.random.randn(m, n))\nb = np.random.randn(m)\n\n# QP: min (1/2)xᵀ(AᵀA)x - (Aᵀb)ᵀx\nP = A.T @ A\nq = -A.T @ b\nA = sparse.eye(n)\nl = np.zeros(n)\nu = np.ones(n)\n\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u)\nres = prob.solve()\nprint(f\"Bounded LS solution: {res.x.round(3)}\")"
+  },
+  {
+    "description": "23. Elastic Net Regression",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nm, n = 50, 15\nA = sparse.csc_matrix(np.random.randn(m, n))\nb = np.random.randn(m)\nlam_l1, lam_l2 = 0.1, 0.2\n\n# Elastic Net: (1/2)||Ax - b||² + λ₁||x||₁ + λ₂||x||²\nP = A.T @ A + 2 * lam_l2 * sparse.eye(n)\nq = -A.T @ b + lam_l1 * np.ones(n)\nA = sparse.eye(n)\nl = -np.inf * np.ones(n)  # No constraints (L1 handled via q)\nu = np.inf * np.ones(n)\n\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u)\nres = prob.solve()\nprint(f\"Elastic Net coefficients: {res.x.round(3)}\")"
+  },
+  {
+    "description": "24. Robust Regression (Huber Loss)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nm, n = 40, 20\nA = sparse.csc_matrix(np.random.randn(m, n))\nb = np.random.randn(m)\ndelta = 1.0  # Huber threshold\n\n# Reformulate Huber as QP with slack variables\nP = sparse.block_diag([A.T @ A, sparse.eye(m)]).tocsc()\nq = np.hstack([-A.T @ b, delta * np.ones(m)])\nA = sparse.vstack([\n    sparse.hstack([A, -sparse.eye(m)]),  # Ax - b ≤ s\n    sparse.hstack([-A, -sparse.eye(m)])  # -Ax + b ≤ s\n])\nl = -np.inf * np.ones(2 * m)\nu = np.hstack([b, -b])\n\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u)\nres = prob.solve()\nprint(f\"Robust regression weights: {res.x[:n].round(3)}\")"
+  },
+  {
+    "description": "25. Economic Dispatch (Power Systems)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nn = 10  # Generators\nc = np.random.rand(n)  # Quadratic cost coefficients\nP_max = np.random.rand(n)  # Max capacity\ndemand = 3.0  # Total demand\n\n# QP: min ∑(c_i x_i²) s.t. ∑x_i = demand, 0 ≤ x_i ≤ P_max\nP = sparse.diags(2 * c)\nq = np.zeros(n)\nA = sparse.vstack([np.ones(n), sparse.eye(n)])\nl = np.hstack([demand, np.zeros(n)])\nu = np.hstack([demand, P_max])\n\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u)\nres = prob.solve()\nprint(f\"Generator outputs: {res.x.round(3)}\")"
+  },
+  {
+    "description": "26. Portfolio Optimization",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nn = 10\nP = sparse.csc_matrix(np.random.randn(n, n))\nP = P.T @ P\nq = np.zeros(n)\nA = sparse.csc_matrix(np.vstack([np.ones(n), np.random.randn(2, n)]))\nl = np.array([1, 0.05, -0.1])\nu = np.array([1, 0.1, 0.1])\n\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u, verbose=True)\nres = prob.solve()\nprint(res.x.round(3))"
+  },
+  {
+    "description": "27. Economic Dispatch",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nn = 10\nc = np.random.rand(n)\nP_max = np.random.rand(n) * 10\ndemand = 3.0\n\nP = sparse.diags(2 * c)\nq = np.zeros(n)\nA = sparse.vstack([np.ones(n), sparse.eye(n)])\nl = np.hstack([demand, np.zeros(n)])\nu = np.hstack([demand, P_max])\n\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u, verbose=True)\nres = prob.solve()\nprint(res.x.round(3))"
+  },
+  {
+    "description": "28. Kalman Filter",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\n\nnp.random.seed(69)\nn = 10 \nA = np.eye(n) + 0.1 * np.random.randn(n, n)\nQ = sparse.eye(n)\nH = sparse.eye(n)\nR = sparse.eye(n)\nb_meas = np.random.randn(n)\n\nP = Q + H.T @ R @ H\nq = -2 * (H.T @ R @ b_meas)\nA = sparse.eye(n)\nl = np.zeros(n)\nu = np.zeros(n)\n\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u, verbose=True)\nres = prob.solve()\nprint(res.x.round(3))"
+  },
+  {
+    "description": "29. Resource Allocation with Bounds",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nn = 15  # Variables (resources)\nm = 20  # Constraints\n\n# Generate random data\nprofit = np.random.rand(n)          # Profit per resource\nbudget = 10.0                       # Total budget\nmin_alloc = 0.1 * np.ones(n)        # Minimum allocation per resource\nmax_alloc = 1.0 * np.ones(n)        # Maximum allocation per resource\n\n# QP: min -profit^T x + 0.1||x||² (regularization) s.t. min_alloc ≤ x ≤ max_alloc, sum(x) ≤ budget\nP = sparse.diags(0.1 * np.ones(n))  # Small regularization for convexity\nq = -profit\nA = sparse.vstack([\n    np.ones(n),                     # Budget constraint (sum(x) ≤ budget)\n    sparse.eye(n)                   # Bounds (min_alloc ≤ x ≤ max_alloc)\n])\nl = np.hstack([-np.inf, min_alloc]) # Lower bounds (no lower on budget)\nu = np.hstack([budget, max_alloc])  # Upper bounds\n\n# Solve\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u, verbose=True)\nres = prob.solve()\nprint(f\"Optimal allocation: {res.x.round(3)}\")"
+  },
+  {
+    "description": "30. Constrained Least Squares (Control Engineering)",
+    "code": "import osqp\nimport numpy as np\nfrom scipy import sparse\n\nn_states = 10  # State variables\nn_inputs = 10  # Control variables\nn = n_states + n_inputs  # Total variables\nm = 15         # Constraints\n\n# System dynamics: x_next = A x + B u (random stable system)\nA = sparse.diags(np.random.rand(n_states) * 0.9)  # Stable diagonal dynamics\nB = sparse.random(n_states, n_inputs, density=0.5)\ntarget = np.random.randn(n_states)  # Target state\n\n# QP: min ||x - target||² + 0.1||u||² s.t. x = A x + B u, |u| ≤ 1\nP = sparse.block_diag([sparse.eye(n_states), 0.1 * sparse.eye(n_inputs)])\nq = np.hstack([-2 * target, np.zeros(n_inputs)])\nA_dyn = sparse.hstack([sparse.eye(n_states) - A, -B])\nA_bounds = sparse.hstack([sparse.csc_matrix((n_inputs, n_states)), sparse.eye(n_inputs)])\nA = sparse.vstack([A_dyn, A_bounds])\nl = np.hstack([np.zeros(n_states), -np.ones(n_inputs)])  # x = A x + B u, u ≥ -1\nu = np.hstack([np.zeros(n_states), np.ones(n_inputs)])   # u ≤ 1\n\n# Solve\nprob = osqp.OSQP()\nprob.setup(P=P, q=q, A=A, l=l, u=u, verbose=True)\nres = prob.solve()\nprint(f\"Optimal states: {res.x[:n_states].round(3)}\")\nprint(f\"Optimal inputs: {res.x[n_states:].round(3)}\")"
+  }
+]
